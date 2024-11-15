@@ -22,16 +22,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
 import javax.naming.ldap.Rdn;
-import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 
-public abstract class PromptingCertManager implements X509TrustManager, HostnameVerifier {
+public abstract class PromptingCertManager implements CertManager {
 
 	static Logger log = System.getLogger(PromptingCertManager.class.getName());
 
@@ -160,6 +158,7 @@ public abstract class PromptingCertManager implements X509TrustManager, Hostname
 		HttpsURLConnection.setDefaultHostnameVerifier(this);
 	}
 
+	@Override
 	public SSLContext getSSLContext() {
 		return sslContext;
 	}
@@ -381,6 +380,7 @@ public abstract class PromptingCertManager implements X509TrustManager, Hostname
 	
 	public abstract void save(String encodedKey);
 
+	@Override
 	public SSLParameters getSSLParameters() {
 		return sslParameters;
 	}
