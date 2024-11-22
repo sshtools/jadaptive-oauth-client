@@ -43,11 +43,12 @@ public abstract class PromptingCertManager implements CertManager {
 
 	private SSLContext sslContext;
 	private SSLParameters sslParameters;
-	private final ResourceBundle bundle;
 	private final boolean strictSSL;
 
+	protected final ResourceBundle bundle;
+
 	public PromptingCertManager(ResourceBundle bundle) {
-		this(bundle, "true".equals(System.getProperty("vnsee-agent.strictSSL", "true")));
+		this(bundle, "true".equals(System.getProperty("oauth2.strictSSL", "true")));
 	}
 
 	public PromptingCertManager(ResourceBundle bundle, boolean strictSSL) {

@@ -1,5 +1,7 @@
 package com.jadaptive.oauth.client;
 
+import static com.jadaptive.oauth.client.JsonUtil.parseJSON;
+
 import java.io.IOException;
 import java.io.StringReader;
 import java.lang.System.Logger;
@@ -163,15 +165,5 @@ public final class OAuthClient {
         });
         return bldr.connectTimeout(Duration.ofSeconds(15)).followRedirects(HttpClient.Redirect.NORMAL).build();
 
-    }
-
-    protected static JsonObject parseJSON(String json) {
-        if (log.isLoggable(Level.DEBUG)) {
-            log.log(Level.DEBUG, json);
-        }
-
-        try(var rdr = Json.createReader(new StringReader(json))) {
-            return rdr.readObject();
-        }
     }
 }
