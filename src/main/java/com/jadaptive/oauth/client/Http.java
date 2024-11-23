@@ -143,7 +143,7 @@ public final class Http {
 		return new Http.Builder().
 			fromHttp(this).
 			addHeaders(new NameValuePair[] {
-				new NameValuePair("Authentication", authentication)
+				new NameValuePair("Authorization", authentication)
 			}).
 			build();
 	}
