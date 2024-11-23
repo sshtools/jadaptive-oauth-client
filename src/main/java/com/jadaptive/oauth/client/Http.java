@@ -11,6 +11,7 @@ import java.net.http.HttpRequest.BodyPublisher;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -30,6 +31,12 @@ public final class Http {
 		private Optional<URI> uri = Optional.empty();
 		private Optional<Supplier<HttpClient>> clientSupplier = Optional.empty();
 		private List<NameValuePair> headers = new ArrayList<>();
+
+		public Builder fromHttp(Http http) {
+			return withUri(http.uri).
+				withClient(http.clientSupplier).
+				withHeaders(http.headers);
+		}
 
 		public Builder withHost(String hostname) {
 			return withHost(hostname, 443);
@@ -73,6 +80,14 @@ public final class Http {
 			return withClient(() -> client);
 		}
 
+		public Builder withDefaultClient(CertManager certManager) {
+			return withClient(() -> {
+		        var bldr =  HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1);
+		        bldr.sslContext(certManager.getSSLContext()).sslParameters(certManager.getSSLParameters());
+		        return bldr.connectTimeout(Duration.ofSeconds(15)).followRedirects(HttpClient.Redirect.NORMAL).build();
+			});
+		}
+
 		public Builder withClient(Supplier<HttpClient> clientSupplier) {
 			this.clientSupplier = Optional.of(clientSupplier);
 			return this;
@@ -107,7 +122,7 @@ public final class Http {
 			}
 			var request = bldr.GET().build();
 
-			log.log(Level.INFO, "Executing request " + request.toString());
+			log.log(Level.DEBUG, "Executing request " + request.toString());
 
 			var response = client.send(request, HttpResponse.BodyHandlers.ofString());
 			var body = response.body();
@@ -122,6 +137,15 @@ public final class Http {
 		} catch (InterruptedException e) {
 			throw new IllegalStateException(e);
 		}
+	}
+	
+	public Http authenticate(String authentication) {
+		return new Http.Builder().
+			fromHttp(this).
+			addHeaders(new NameValuePair[] {
+				new NameValuePair("Authentication", authentication)
+			}).
+			build();
 	}
 
 	public String postJson(String path, String json)
@@ -147,7 +171,7 @@ public final class Http {
 			}
 			var request = bldr.POST(content).build();
 
-			log.log(Level.INFO, "Executing request " + request.toString());
+			log.log(Level.DEBUG, "Executing request " + request.toString());
 
 			var response = client.send(request, HttpResponse.BodyHandlers.ofString());
 			var body = response.body();
