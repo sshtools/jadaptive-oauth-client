@@ -30,7 +30,7 @@ import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 
 public abstract class PromptingCertManager implements CertManager {
-
+	
 	static Logger log = System.getLogger(PromptingCertManager.class.getName());
 
 	public static enum PromptType {
@@ -68,7 +68,7 @@ public abstract class PromptingCertManager implements CertManager {
 	}
 
 	@Override
-	public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+	public final void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
 		if (!isStrictSSL()) {
 			return;
 		}

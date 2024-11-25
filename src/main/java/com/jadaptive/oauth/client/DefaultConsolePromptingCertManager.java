@@ -20,6 +20,10 @@ public final class DefaultConsolePromptingCertManager extends PromptingCertManag
 	private final Supplier<List<String>> currentCertsSupplier;
 	private final Consumer<List<String>> newCertsConsumer;
 
+	public DefaultConsolePromptingCertManager() {
+		this(null, false, () -> null, (l) -> {});
+	}
+
 	public DefaultConsolePromptingCertManager(ResourceBundle bundle, boolean strictSSL, Supplier<List<String>> currentCertsSupplier, Consumer<List<String>> newCertsConsumer) {
 		super(bundle, strictSSL);
 		this.currentCertsSupplier = currentCertsSupplier;
