@@ -23,6 +23,10 @@ public final class DefaultConsolePromptingCertManager extends PromptingCertManag
 	public DefaultConsolePromptingCertManager() {
 		this(null, false, () -> null, (l) -> {});
 	}
+	
+	public DefaultConsolePromptingCertManager(boolean strictSSL) {
+		this(null, strictSSL, () -> null, (l) -> {});
+	}
 
 	public DefaultConsolePromptingCertManager(ResourceBundle bundle, boolean strictSSL, Supplier<List<String>> currentCertsSupplier, Consumer<List<String>> newCertsConsumer) {
 		super(bundle, strictSSL);
