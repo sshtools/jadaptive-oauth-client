@@ -133,7 +133,7 @@ public final class Http {
 			if (response.statusCode() != 200) {
 				var ctype = response.headers().firstValue("Content-Type").orElse(null);
 				if (APPLICATION_JSON.equals(ctype)) {
-					throw new ResponseException(JsonUtil.parseJSON(body));
+					throw new ResponseException(JsonUtil.parseJSON(body), response.headers());
 				}
 				throw new IOException(body);
 			}
@@ -182,7 +182,7 @@ public final class Http {
 			if (response.statusCode() != 200) {
 				var ctype = response.headers().firstValue("Content-Type").orElse(null);
 				if (APPLICATION_JSON.equals(ctype)) {
-					throw new ResponseException(JsonUtil.parseJSON(body));
+					throw new ResponseException(JsonUtil.parseJSON(body), response.headers());
 				}
 				throw new IOException(body);
 			}
