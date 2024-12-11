@@ -3,6 +3,7 @@ package com.jadaptive.oauth.client;
 import java.io.IOException;
 import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
+import java.net.Authenticator;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -29,6 +30,7 @@ public final class Http {
 
 	public final static class Builder {
 		private Optional<URI> uri = Optional.empty();
+		private Optional<Authenticator> authenticator = Optional.empty();
 		private Optional<Supplier<HttpClient>> clientSupplier = Optional.empty();
 		private List<NameValuePair> headers = new ArrayList<>();
 
@@ -103,8 +105,10 @@ public final class Http {
 	private final URI uri;
 	private final Supplier<HttpClient> clientSupplier;
 	private final List<NameValuePair> headers;
+	private final Optional<Authenticator> authenticator;
 
 	private Http(Builder bldr) {
+		this.authenticator = bldr.authenticator;
 		this.uri = bldr.uri.orElseThrow(() -> new IllegalStateException("No URI supplied."));
 		this.clientSupplier = bldr.clientSupplier.orElseThrow(() -> new IllegalStateException("No client supplied."));
 		this.headers = Collections.unmodifiableList(new ArrayList<>(bldr.headers));
@@ -115,7 +119,7 @@ public final class Http {
 		var client = clientSupplier.get();
 
 		try {
-			var bldr = HttpRequest.newBuilder(url).header("Content-Type", APPLICATION_X_WWW_FORM_URLENCODED);
+			var bldr = newBuilder(url).header("Content-Type", APPLICATION_X_WWW_FORM_URLENCODED);
 			this.headers.forEach(h -> bldr.header(h.name(), h.value()));
 			for (var hdr : headers) {
 				bldr.header(hdr.name(), hdr.value());
@@ -164,7 +168,7 @@ public final class Http {
 		var client = clientSupplier.get();
 
 		try {
-			var bldr = HttpRequest.newBuilder(url).header("Content-Type", contentType);
+			var bldr = newBuilder(url).header("Content-Type", contentType);
 			this.headers.forEach(h -> bldr.header(h.name(), h.value()));
 			for (var hdr : headers) {
 				bldr.header(hdr.name(), hdr.value());
@@ -187,6 +191,11 @@ public final class Http {
 			throw new IllegalStateException(e);
 		}
 
+	}
+
+	private HttpRequest.Builder newBuilder(URI url) {
+		var bldr = HttpRequest.newBuilder(url);
+		return bldr;
 	}
 
 	public static HttpRequest.BodyPublisher ofNameValuePairs(NameValuePair... parms) {
