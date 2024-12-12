@@ -30,7 +30,6 @@ public final class Http {
 
 	public final static class Builder {
 		private Optional<URI> uri = Optional.empty();
-		private Optional<Authenticator> authenticator = Optional.empty();
 		private Optional<Supplier<HttpClient>> clientSupplier = Optional.empty();
 		private List<NameValuePair> headers = new ArrayList<>();
 
@@ -105,10 +104,8 @@ public final class Http {
 	private final URI uri;
 	private final Supplier<HttpClient> clientSupplier;
 	private final List<NameValuePair> headers;
-	private final Optional<Authenticator> authenticator;
 
 	private Http(Builder bldr) {
-		this.authenticator = bldr.authenticator;
 		this.uri = bldr.uri.orElseThrow(() -> new IllegalStateException("No URI supplied."));
 		this.clientSupplier = bldr.clientSupplier.orElseThrow(() -> new IllegalStateException("No client supplied."));
 		this.headers = Collections.unmodifiableList(new ArrayList<>(bldr.headers));
@@ -194,8 +191,7 @@ public final class Http {
 	}
 
 	private HttpRequest.Builder newBuilder(URI url) {
-		var bldr = HttpRequest.newBuilder(url);
-		return bldr;
+		return HttpRequest.newBuilder(url);
 	}
 
 	public static HttpRequest.BodyPublisher ofNameValuePairs(NameValuePair... parms) {

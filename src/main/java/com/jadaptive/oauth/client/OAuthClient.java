@@ -87,13 +87,13 @@ public final class OAuthClient {
 	        log.log(Level.DEBUG, "Awaiting authorization for device {}", device.device_code());
 	        while(System.currentTimeMillis() < expire) {
 	
-	        	/* Now authenticated, get our bearer token */
 	            var response = new BearerToken(parseJSON(http.postForm("/oauth2/token?",
 	                    new NameValuePair("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
 	                    new NameValuePair("device_code", device.device_code()))
 	            ));
 	            
 	            if(response.error() == null) {
+	                /* Now authenticated, get our bearer token */
 	            	onToken.orElseThrow(() -> new IllegalStateException("No onToken handler.")).handle(
             			device, 
             			response, 
