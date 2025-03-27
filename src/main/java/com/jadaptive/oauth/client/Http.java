@@ -3,7 +3,6 @@ package com.jadaptive.oauth.client;
 import java.io.IOException;
 import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
-import java.net.Authenticator;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;

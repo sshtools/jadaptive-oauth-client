@@ -21,21 +21,6 @@ public class OAuth2Objects {
             );
         }
     }
-
-    
-    public final static record ConfigurationPayload(String pubkey, String username, String hostname, int port, String agentName, String tenant) {
-        
-        public ConfigurationPayload(JsonObject json) {
-            this(
-                json.getString("pubkey", null),   
-                json.getString("username", null),   
-                json.getString("hostname", null),   
-                json.getInt("port", 2222),   
-                json.getString("agentName", null),   
-                json.getString("tenant", null)
-            );
-        }
-    }
     
     public final static record DeviceCode(String device_code,
                                         long expires_in,

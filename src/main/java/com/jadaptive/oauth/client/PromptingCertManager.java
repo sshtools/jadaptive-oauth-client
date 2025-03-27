@@ -78,7 +78,7 @@ public abstract class PromptingCertManager implements CertManager {
 			try {
 				if (log.isLoggable(Level.DEBUG))
 					log.log(Level.DEBUG, "Validating: {}", c);
-				chainSubjectDN.add(c.getSubjectDN().toString());
+				chainSubjectDN.add(c.getSubjectX500Principal().toString());
 				c.checkValidity();
 			} catch (CertificateExpiredException | CertificateNotYetValidException ce) {
 				/* Already been accepted? */
@@ -96,7 +96,7 @@ public abstract class PromptingCertManager implements CertManager {
 				
 				if (isToolkitThread()) {
 					boolean ok = promptForCertificate(PromptType.WARNING, title, content, encodedKey,
-							c.getSubjectDN().toString(), ce.getMessage());
+							c.getSubjectX500Principal().toString(), ce.getMessage());
 					if (ok) {
 						accept(encodedKey);
 					} else
@@ -109,7 +109,7 @@ public abstract class PromptingCertManager implements CertManager {
 						sem.acquire();
 						runOnToolkitThread(() -> {
 							res.set(promptForCertificate(PromptType.WARNING, title, content, encodedKey,
-									c.getSubjectDN().toString(), ce.getMessage()));
+									c.getSubjectX500Principal().toString(), ce.getMessage()));
 							sem.release();
 						});
 						sem.acquire();
