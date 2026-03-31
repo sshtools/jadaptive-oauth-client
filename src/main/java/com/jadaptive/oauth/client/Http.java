@@ -110,6 +110,10 @@ public final class Http {
 		this.headers = Collections.unmodifiableList(new ArrayList<>(bldr.headers));
 	}
 
+	public URI getUri() {
+		return uri;
+	}
+
 	public String get(String path, NameValuePair... headers) throws IOException, ResponseException {
 		var url = uri.resolve(path);
 		var client = clientSupplier.get();

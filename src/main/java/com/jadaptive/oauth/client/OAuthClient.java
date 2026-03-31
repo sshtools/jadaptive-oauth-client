@@ -26,14 +26,52 @@ public final class OAuthClient {
 	    private Optional<Supplier<Http>> httpProvider = Optional.empty();
 		private Optional<Consumer<DeviceCode>> onPrompt = Optional.empty();
 		private Optional<TokenHandler> onToken = Optional.empty();
+		private Optional<TokenHandler> onTokenReady = Optional.empty();
+		private Optional<Consumer<BearerToken>> onTokenIssued = Optional.empty();
+		private Optional<BearerToken> existingToken = Optional.empty();
+		
+		private boolean dpop = false;
+		private java.security.KeyPair keyPair = null;
+		
+		public Builder withDPoP(boolean dpop) {
+			this.dpop = dpop;
+			return this;
+		}
+		
+		public Builder withPrivateKey(String keyContent) throws Exception {
+			this.keyPair = DPoPProofFactory.loadKeyPair(keyContent);
+			return this;
+		}
+
+		public Builder withPrivateKey(java.nio.file.Path keyPath) throws Exception {
+			this.keyPair = DPoPProofFactory.loadKeyPair(keyPath);
+			return this;
+		}
+
 	    
 	    public Builder onPrompt(Consumer<DeviceCode> onPrompt) {
 	    	this.onPrompt = Optional.of(onPrompt);
 	    	return this;
 	    }
-	    
+
+	    @Deprecated
 	    public Builder onToken(TokenHandler onToken) {
 	    	this.onToken = Optional.of(onToken);
+	    	return this;
+	    }
+
+	    public Builder onTokenReady(TokenHandler onTokenReady) {
+	    	this.onTokenReady = Optional.of(onTokenReady);
+	    	return this;
+	    }
+
+	    public Builder onTokenIssued(Consumer<BearerToken> onTokenIssued) {
+	    	this.onTokenIssued = Optional.of(onTokenIssued);
+	    	return this;
+	    }
+
+	    public Builder withBearerToken(BearerToken token) {
+	    	this.existingToken = Optional.of(token);
 	    	return this;
 	    }
 		
@@ -61,18 +99,80 @@ public final class OAuthClient {
 	private final String scope;
 	private final Optional<Consumer<DeviceCode>> onPrompt;
 	private final Optional<TokenHandler> onToken;
+	private final Optional<TokenHandler> onTokenReady;
+	private final Optional<Consumer<BearerToken>> onTokenIssued;
+	private final Optional<BearerToken> existingToken;
+	private final boolean dpop;
+	private final java.security.KeyPair keyPair;
 	
 	private OAuthClient(Builder bldr) {
 		this.scope = bldr.scope.orElseThrow(() -> new IllegalStateException("No scope provided"));
 		this.httpProvider = bldr.httpProvider.orElseThrow(() -> new IllegalStateException("No HTTP provider provided"));;
 		this.onPrompt = bldr.onPrompt;
 		this.onToken = bldr.onToken;
+		this.onTokenReady = bldr.onTokenReady;
+		this.onTokenIssued = bldr.onTokenIssued;
+		this.existingToken = bldr.existingToken;
+		this.dpop = bldr.dpop;
+		this.keyPair = bldr.keyPair;
+	}
+
+	private void handleToken(DeviceCode device, BearerToken token, Http http) throws IOException, ResponseException {
+		var authHttp = http.authenticate(token.token_type() + " " + token.access_token());
+		boolean handled = false;
+		if (onTokenReady.isPresent()) {
+			onTokenReady.get().handle(device, token, authHttp);
+			handled = true;
+		}
+		if (onToken.isPresent()) {
+			onToken.get().handle(device, token, authHttp);
+			handled = true;
+		}
+		if (!handled) {
+			throw new IllegalStateException("No onTokenReady handler.");
+		}
+	}
+
+	private BearerToken refreshToken(String refreshToken) throws IOException, ResponseException {
+		var tokenHttp = httpProvider.get();
+		if (dpop && keyPair != null) {
+			String proof = DPoPProofFactory.generateProof("POST", tokenHttp.getUri().resolve("/oauth2/token").toString(), keyPair);
+			tokenHttp = new Http.Builder().fromHttp(tokenHttp).addHeaders(new NameValuePair("DPoP", proof)).build();
+		}
+		return new BearerToken(parseJSON(tokenHttp.postForm("/oauth2/token",
+				new NameValuePair("grant_type", "refresh_token"),
+				new NameValuePair("refresh_token", refreshToken)
+		)));
 	}
 
 	public void authorize() throws IOException, ResponseException {
 		/* Request OAuth2 Device Code flow, get the device code in return */
 		try {
 	        var http = httpProvider.get();
+
+	        if (existingToken.isPresent()) {
+	        	BearerToken token = existingToken.get();
+	        	if (token.error() == null && token.access_token() != null) {
+	        		if (!token.isExpired()) {
+	        			handleToken(null, token, http);
+	        			return;
+	        		}
+	        		if (token.refresh_token() != null) {
+	        			BearerToken refreshed = refreshToken(token.refresh_token());
+	        			if (refreshed.error() == null && refreshed.access_token() != null) {
+	        				onTokenIssued.ifPresent(handler -> handler.accept(refreshed));
+	        				handleToken(null, refreshed, http);
+	        				return;
+	        			}
+	        		}
+	        	}
+	        }
+	        
+	        if (dpop && keyPair != null) {
+	        	String proof = DPoPProofFactory.generateProof("POST", http.getUri().resolve("oauth2/device").toString(), keyPair);
+	        	http = new Http.Builder().fromHttp(http).addHeaders(new NameValuePair("DPoP", proof)).build();
+	        }
+	        	        
 			var device = new OAuth2Objects.DeviceCode(parseJSON(http.postForm("oauth2/device",
 	                new NameValuePair("scope", scope)
 	        )));
@@ -86,19 +186,22 @@ public final class OAuthClient {
 	        var expire = System.currentTimeMillis() + ( device.expires_in() * 1000 );
 	        log.log(Level.DEBUG, "Awaiting authorization for device {}", device.device_code());
 	        while(System.currentTimeMillis() < expire) {
+	        
+	            var tokenHttp = httpProvider.get();
+	            if (dpop && keyPair != null) {
+	                String proof = DPoPProofFactory.generateProof("POST", tokenHttp.getUri().resolve("/oauth2/token").toString(), keyPair);
+	                tokenHttp = new Http.Builder().fromHttp(tokenHttp).addHeaders(new NameValuePair("DPoP", proof)).build();
+	            }
 	
-	            var response = new BearerToken(parseJSON(http.postForm("/oauth2/token?",
+	            var response = new BearerToken(parseJSON(tokenHttp.postForm("/oauth2/token",
 	                    new NameValuePair("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
 	                    new NameValuePair("device_code", device.device_code()))
 	            ));
 	            
 	            if(response.error() == null) {
 	                /* Now authenticated, get our bearer token */
-	            	onToken.orElseThrow(() -> new IllegalStateException("No onToken handler.")).handle(
-            			device, 
-            			response, 
-            			http.authenticate(response.token_type() + " " + response.access_token())
-	            	);
+	            	onTokenIssued.ifPresent(handler -> handler.accept(response));
+	            	handleToken(device, response, http);
 	            	return;
 	            }
 	            else if(response.error().equals("authorization_denied") || response.error().equals("expired_token")) {
