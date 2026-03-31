@@ -61,7 +61,7 @@ public class StandardOAuthExample {
 }
 ```
 
-### 2. High-Security DPoP Flow
+### 2. High-Security DPoP Flow (Fixed Key)
 
 Demonstrating Proof-of-Possession (DPoP) issues bound sender tokens, preventing token interception and replay attacks. 
 You can enable DPoP by simply providing an RSA Private Key. The library will automatically create the required JWTs.
@@ -115,7 +115,52 @@ public class DPoPOAuthExample {
 }
 ```
 
-### 3. Reuse or Refresh an Existing Token
+### 3. High-Security DPoP Flow (Key Generator + Rotation)
+
+If you prefer runtime key generation, supply a generator. This is useful when you want to rotate the DPoP key on refresh.
+
+```java
+import com.jadaptive.oauth.client.Http;
+import com.jadaptive.oauth.client.OAuthClient;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+
+public class DPoPOAuthGeneratorExample {
+
+    public static void main(String[] args) throws Exception {
+        Http http = new Http.Builder()
+            .withUri(URI.create("https://auth.example.com"))
+            .withClient(HttpClient.newHttpClient())
+            .build();
+
+        OAuthClient client = new OAuthClient.Builder()
+            .withHttp(http)
+            .withScope("read write")
+            .withDPoP(true)
+            .withDPoPKeyGenerator(() -> {
+                try {
+                    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+                    kpg.initialize(2048);
+                    return kpg.generateKeyPair();
+                } catch (Exception e) {
+                    throw new IllegalStateException("Failed to create DPoP key", e);
+                }
+            })
+            .withRotateDpopOnRefresh(true)
+            .onPrompt(deviceCode -> System.out.println(deviceCode.verification_uri_complete()))
+            .onTokenReady((deviceCode, token, authenticatedHttp) -> {
+                System.out.println("Token ready: " + token.access_token());
+            })
+            .build();
+
+        client.authorize();
+    }
+}
+```
+
+### 4. Reuse or Refresh an Existing Token
 
 If you already have a stored token, deserialize it and pass it to the builder. The client will:
 

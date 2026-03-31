@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Base64;
 import java.io.IOException;
 import java.net.URI;
@@ -274,10 +275,23 @@ public class OAuthClientTest {
                 issuedAt
         );
 
-        OAuthClient client = new OAuthClient.Builder()
+                AtomicInteger generatorCalls = new AtomicInteger(0);
+                OAuthClient client = new OAuthClient.Builder()
                 .withHttp(http)
                 .withScope("read")
                 .withBearerToken(token)
+                                .withDPoP(true)
+                                .withRotateDpopOnRefresh(true)
+                                .withDPoPKeyGenerator(() -> {
+                                        generatorCalls.incrementAndGet();
+                                        try {
+                                                KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+                                                kpg.initialize(2048);
+                                                return kpg.generateKeyPair();
+                                        } catch (Exception e) {
+                                                throw new IllegalStateException(e);
+                                        }
+                                })
                 .onTokenReady((deviceCode, bearerToken, authenticatedHttp) -> tokenReadyCalled = true)
                 .onToken((deviceCode, bearerToken, authenticatedHttp) -> tokenHandlerCalled = true)
                 .onTokenIssued(bearerToken -> tokenIssuedCalled = true)
@@ -289,6 +303,7 @@ public class OAuthClientTest {
         assertTrue(tokenReadyCalled);
         assertTrue(tokenIssuedCalled);
         assertFalse(promptCalled);
+                assertEquals(1, generatorCalls.get(), "DPoP key generator should be called on refresh");
         verify(1, postRequestedFor(urlPathEqualTo("/oauth2/token")));
     }
 

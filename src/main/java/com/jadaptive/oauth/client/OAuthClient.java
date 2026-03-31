@@ -32,6 +32,8 @@ public final class OAuthClient {
 		
 		private boolean dpop = false;
 		private java.security.KeyPair keyPair = null;
+		private Optional<Supplier<java.security.KeyPair>> dpopKeyGenerator = Optional.empty();
+		private boolean rotateDpopOnRefresh = false;
 		
 		public Builder withDPoP(boolean dpop) {
 			this.dpop = dpop;
@@ -45,6 +47,16 @@ public final class OAuthClient {
 
 		public Builder withPrivateKey(java.nio.file.Path keyPath) throws Exception {
 			this.keyPair = DPoPProofFactory.loadKeyPair(keyPath);
+			return this;
+		}
+
+		public Builder withDPoPKeyGenerator(Supplier<java.security.KeyPair> keyGenerator) {
+			this.dpopKeyGenerator = Optional.of(keyGenerator);
+			return this;
+		}
+
+		public Builder withRotateDpopOnRefresh(boolean rotate) {
+			this.rotateDpopOnRefresh = rotate;
 			return this;
 		}
 
@@ -104,6 +116,9 @@ public final class OAuthClient {
 	private final Optional<BearerToken> existingToken;
 	private final boolean dpop;
 	private final java.security.KeyPair keyPair;
+	private final Optional<Supplier<java.security.KeyPair>> dpopKeyGenerator;
+	private final boolean rotateDpopOnRefresh;
+	private java.security.KeyPair currentDpopKeyPair;
 	
 	private OAuthClient(Builder bldr) {
 		this.scope = bldr.scope.orElseThrow(() -> new IllegalStateException("No scope provided"));
@@ -115,6 +130,27 @@ public final class OAuthClient {
 		this.existingToken = bldr.existingToken;
 		this.dpop = bldr.dpop;
 		this.keyPair = bldr.keyPair;
+		this.dpopKeyGenerator = bldr.dpopKeyGenerator;
+		this.rotateDpopOnRefresh = bldr.rotateDpopOnRefresh;
+		this.currentDpopKeyPair = bldr.keyPair;
+	}
+
+	private java.security.KeyPair resolveDpopKeyPair(boolean forRefresh) {
+		if (!dpop) {
+			return null;
+		}
+		if (forRefresh && rotateDpopOnRefresh && dpopKeyGenerator.isPresent()) {
+			currentDpopKeyPair = dpopKeyGenerator.get().get();
+			return currentDpopKeyPair;
+		}
+		if (currentDpopKeyPair != null) {
+			return currentDpopKeyPair;
+		}
+		if (dpopKeyGenerator.isPresent()) {
+			currentDpopKeyPair = dpopKeyGenerator.get().get();
+			return currentDpopKeyPair;
+		}
+		return null;
 	}
 
 	private void handleToken(DeviceCode device, BearerToken token, Http http) throws IOException, ResponseException {
@@ -135,8 +171,9 @@ public final class OAuthClient {
 
 	private BearerToken refreshToken(String refreshToken) throws IOException, ResponseException {
 		var tokenHttp = httpProvider.get();
-		if (dpop && keyPair != null) {
-			String proof = DPoPProofFactory.generateProof("POST", tokenHttp.getUri().resolve("/oauth2/token").toString(), keyPair);
+		var dpopKey = resolveDpopKeyPair(true);
+		if (dpop && dpopKey != null) {
+			String proof = DPoPProofFactory.generateProof("POST", tokenHttp.getUri().resolve("/oauth2/token").toString(), dpopKey);
 			tokenHttp = new Http.Builder().fromHttp(tokenHttp).addHeaders(new NameValuePair("DPoP", proof)).build();
 		}
 		return new BearerToken(parseJSON(tokenHttp.postForm("/oauth2/token",
@@ -168,8 +205,9 @@ public final class OAuthClient {
 	        	}
 	        }
 	        
-	        if (dpop && keyPair != null) {
-	        	String proof = DPoPProofFactory.generateProof("POST", http.getUri().resolve("oauth2/device").toString(), keyPair);
+	        var deviceKey = resolveDpopKeyPair(false);
+	        if (dpop && deviceKey != null) {
+	        	String proof = DPoPProofFactory.generateProof("POST", http.getUri().resolve("oauth2/device").toString(), deviceKey);
 	        	http = new Http.Builder().fromHttp(http).addHeaders(new NameValuePair("DPoP", proof)).build();
 	        }
 	        	        
@@ -188,8 +226,9 @@ public final class OAuthClient {
 	        while(System.currentTimeMillis() < expire) {
 	        
 	            var tokenHttp = httpProvider.get();
-	            if (dpop && keyPair != null) {
-	                String proof = DPoPProofFactory.generateProof("POST", tokenHttp.getUri().resolve("/oauth2/token").toString(), keyPair);
+	            var tokenKey = resolveDpopKeyPair(false);
+	            if (dpop && tokenKey != null) {
+	                String proof = DPoPProofFactory.generateProof("POST", tokenHttp.getUri().resolve("/oauth2/token").toString(), tokenKey);
 	                tokenHttp = new Http.Builder().fromHttp(tokenHttp).addHeaders(new NameValuePair("DPoP", proof)).build();
 	            }
 	
