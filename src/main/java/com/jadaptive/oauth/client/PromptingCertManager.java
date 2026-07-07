@@ -137,8 +137,7 @@ public abstract class PromptingCertManager implements CertManager {
 	private void installCertificateVerifier() {
 
 		if (!isStrictSSL()) {
-			log.log(Level.WARNING,
-					"NOT FOR PRODUCTION USE. All SSL certificates will be trusted regardless of status. This should only be used for testing.");
+			untrustedCertWarning();
 		}
 
 		Security.insertProviderAt(new ClientTrustProvider(this), 1);
@@ -232,6 +231,12 @@ public abstract class PromptingCertManager implements CertManager {
 			}
 		}
 	}
+
+	protected void untrustedCertWarning() {
+		log.log(Level.WARNING,
+				"NOT FOR PRODUCTION USE. All SSL certificates will be trusted regardless of status. This should only be used for testing.");
+	}
+	
 	protected void verifyHostname(SSLSession sslSession) throws SSLPeerUnverifiedException {
 		try {
 			String hostname = sslSession.getPeerHost();
